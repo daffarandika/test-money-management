@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>My Money</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #fff; --text: #1d2330; --muted: #6b7280;
+    --line: #e5e7eb; --accent: #2563eb; --income: #15803d; --expense: #b91c1c;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #11141b; --card: #1a1f2b; --text: #e8ebf2; --muted: #9aa3b5;
+            --line: #2a3142; --accent: #5b8cff; --income: #4ade80; --expense: #f87171; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--text); line-height: 1.4; }
+  main { max-width: 760px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.4rem; margin: 8px 0 16px; }
+  h2 { font-size: 1rem; margin: 0 0 12px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+          padding: 16px; margin-bottom: 16px; }
+  .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .summary .card { margin: 0; }
+  .label { color: var(--muted); font-size: .8rem; }
+  .value { font-size: 1.15rem; font-weight: 700; margin-top: 4px; word-break: break-word; }
+  .income { color: var(--income); } .expense { color: var(--expense); }
+  form { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  form .full { grid-column: 1 / -1; }
+  label { display: block; font-size: .8rem; color: var(--muted); margin-bottom: 4px; }
+  input, select, button { font: inherit; }
+  input, select { width: 100%; padding: 9px 10px; border: 1px solid var(--line);
+                  border-radius: 8px; background: var(--bg); color: var(--text); }
+  button { cursor: pointer; border: none; border-radius: 8px; padding: 10px 14px;
+           background: var(--accent); color: #fff; font-weight: 600; }
+  button.secondary { background: transparent; color: var(--text); border: 1px solid var(--line); }
+  button.icon { background: none; color: var(--muted); padding: 4px 8px; font-size: 1.1rem; }
+  button.icon:hover { color: var(--expense); }
+  .type-toggle { display: flex; gap: 8px; }
+  .type-toggle label { flex: 1; margin: 0; }
+  .type-toggle input { display: none; }
+  .type-toggle span { display: block; text-align: center; padding: 9px; border: 1px solid var(--line);
+                      border-radius: 8px; cursor: pointer; color: var(--text); font-size: .95rem; }
+  .type-toggle input:checked + span { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .filters { display: flex; gap: 10px; flex-wrap: wrap; align-items: end; margin-bottom: 12px; }
+  .filters > div { flex: 1; min-width: 130px; }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li.tx { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+  li.tx:first-child { border-top: none; }
+  .tx .info { flex: 1; min-width: 0; }
+  .tx .desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .tx .meta { color: var(--muted); font-size: .8rem; }
+  .tx .amt { font-weight: 700; white-space: nowrap; }
+  .bar { height: 6px; background: var(--line); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+  .bar > div { height: 100%; background: var(--expense); }
+  .cat-row { margin-bottom: 10px; }
+  .cat-row .top { display: flex; justify-content: space-between; font-size: .9rem; }
+  .empty { color: var(--muted); text-align: center; padding: 16px 0; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+  @media (max-width: 520px) { .summary { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>My Money</h1>
+
+  <section class="summary" aria-label="Summary">
+    <div class="card"><div class="label">Income</div><div class="value income" id="sumIncome">0</div></div>
+    <div class="card"><div class="label">Expenses</div><div class="value expense" id="sumExpense">0</div></div>
+    <div class="card"><div class="label">Balance</div><div class="value" id="sumBalance">0</div></div>
+  </section>
+
+  <section class="card">
+    <h2 id="formTitle">Add transaction</h2>
+    <form id="txForm">
+      <div class="full type-toggle">
+        <label><input type="radio" name="type" value="expense" checked><span>Expense</span></label>
+        <label><input type="radio" name="type" value="income"><span>Income</span></label>
+      </div>
+      <div>
+        <label for="amount">Amount</label>
+        <input id="amount" type="number" min="0" step="any" inputmode="decimal" required placeholder="0">
+      </div>
+      <div>
+        <label for="date">Date</label>
+        <input id="date" type="date" required>
+      </div>
+      <div>
+        <label for="category">Category</label>
+        <select id="category"></select>
+      </div>
+      <div>
+        <label for="desc">Description</label>
+        <input id="desc" type="text" maxlength="80" placeholder="Optional">
+      </div>
+      <div class="full actions" style="margin-top:0">
+        <button type="submit" id="submitBtn">Add</button>
+        <button type="button" class="secondary" id="cancelEdit" hidden>Cancel edit</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Spending by category</h2>
+    <div class="filters">
+      <div>
+        <label for="fMonth">Month</label>
+        <input id="fMonth" type="month">
+      </div>
+      <div>
+        <label for="fType">Type</label>
+        <select id="fType">
+          <option value="all">All</option>
+          <option value="expense">Expenses</option>
+          <option value="income">Income</option>
+        </select>
+      </div>
+      <div>
+        <button class="secondary" id="allTime" type="button">All time</button>
+      </div>
+    </div>
+    <div id="breakdown"></div>
+  </section>
+
+  <section class="card">
+    <h2>Transactions</h2>
+    <ul id="list"></ul>
+    <div class="actions">
+      <button class="secondary" id="exportBtn" type="button">Export CSV</button>
+      <button class="secondary" id="clearBtn" type="button">Delete all data</button>
+    </div>
+  </section>
+</main>
+
+<script>
+(() => {
+  // ---- Settings (change these to suit you) ----
+  const CURRENCY = "IDR";
+  const LOCALE = navigator.language || "en-US";
+  const CATEGORIES = {
+    expense: ["Food", "Transport", "Bills", "Shopping", "Health", "Entertainment", "Education", "Other"],
+    income: ["Salary", "Allowance", "Gift", "Side income", "Other"]
+  };
+  const STORAGE_KEY = "money-app-v1";
+
+  // ---- State ----
+  let transactions = load();
+  let editingId = null;
+
+  // ---- Elements ----
+  const $ = id => document.getElementById(id);
+  const form = $("txForm"), amountEl = $("amount"), dateEl = $("date"),
+        catEl = $("category"), descEl = $("desc"), listEl = $("list"),
+        fMonth = $("fMonth"), fType = $("fType");
+
+  const fmt = new Intl.NumberFormat(LOCALE, { style: "currency", currency: CURRENCY, maximumFractionDigits: 2 });
+  const money = n => fmt.format(n);
+
+  function load() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; }
+    catch { return []; }
+  }
+  function save() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions)); } catch {}
+  }
+  const today = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().slice(0, 10);
+  };
+  const currentType = () => form.elements.type.value;
+
+  function fillCategories(selected) {
+    catEl.innerHTML = "";
+    CATEGORIES[currentType()].forEach(c => {
+      const o = document.createElement("option");
+      o.value = o.textContent = c;
+      catEl.appendChild(o);
+    });
+    if (selected) catEl.value = selected;
+  }
+
+  function resetForm() {
+    editingId = null;
+    form.reset();
+    dateEl.value = today();
+    fillCategories();
+    $("formTitle").textContent = "Add transaction";
+    $("submitBtn").textContent = "Add";
+    $("cancelEdit").hidden = true;
+  }
+
+  function filtered() {
+    return transactions
+      .filter(t => (!fMonth.value || t.date.startsWith(fMonth.value)) &&
+                   (fType.value === "all" || t.type === fType.value))
+      .sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+  }
+
+  function render() {
+    const rows = filtered();
+
+    // Summary reflects the current filter
+    const inc = rows.filter(t => t.type === "income").reduce((s, t) => s + t.amount, 0);
+    const exp = rows.filter(t => t.type === "expense").reduce((s, t) => s + t.amount, 0);
+    $("sumIncome").textContent = money(inc);
+    $("sumExpense").textContent = money(exp);
+    const bal = $("sumBalance");
+    bal.textContent = money(inc - exp);
+    bal.className = "value " + (inc - exp < 0 ? "expense" : "income");
+
+    // Category breakdown (expenses only)
+    const totals = {};
+    rows.filter(t => t.type === "expense").forEach(t => {
+      totals[t.category] = (totals[t.category] || 0) + t.amount;
+    });
+    const br = $("breakdown");
+    br.innerHTML = "";
+    const entries = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+    if (!entries.length) {
+      br.innerHTML = '<div class="empty">No expenses for this filter.</div>';
+    } else {
+      entries.forEach(([cat, total]) => {
+        const pct = exp ? (total / exp) * 100 : 0;
+        const row = document.createElement("div");
+        row.className = "cat-row";
+        const top = document.createElement("div");
+        top.className = "top";
+        const a = document.createElement("span"); a.textContent = cat;
+        const b = document.createElement("span"); b.textContent = `${money(total)} · ${pct.toFixed(0)}%`;
+        top.append(a, b);
+        const bar = document.createElement("div"); bar.className = "bar";
+        const fill = document.createElement("div"); fill.style.width = pct + "%";
+        bar.appendChild(fill);
+        row.append(top, bar);
+        br.appendChild(row);
+      });
+    }
+
+    // Transaction list
+    listEl.innerHTML = "";
+    if (!rows.length) {
+      listEl.innerHTML = '<li class="empty">No transactions yet.</li>';
+      return;
+    }
+    rows.forEach(t => {
+      const li = document.createElement("li");
+      li.className = "tx";
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const d = document.createElement("div");
+      d.className = "desc";
+      d.textContent = t.desc || t.category;
+      const m = document.createElement("div");
+      m.className = "meta";
+      m.textContent = `${t.date} · ${t.category}`;
+      info.append(d, m);
+
+      const amt = document.createElement("div");
+      amt.className = "amt " + t.type;
+      amt.textContent = (t.type === "expense" ? "−" : "+") + money(t.amount);
+
+      const edit = document.createElement("button");
+      edit.className = "icon"; edit.title = "Edit"; edit.textContent = "✎";
+      edit.onclick = () => startEdit(t.id);
+      const del = document.createElement("button");
+      del.className = "icon"; del.title = "Delete"; del.textContent = "✕";
+      del.onclick = () => remove(t.id);
+
+      li.append(info, amt, edit, del);
+      listEl.appendChild(li);
+    });
+  }
+
+  function startEdit(id) {
+    const t = transactions.find(x => x.id === id);
+    if (!t) return;
+    editingId = id;
+    form.elements.type.value = t.type;
+    fillCategories(t.category);
+    amountEl.value = t.amount;
+    dateEl.value = t.date;
+    descEl.value = t.desc;
+    $("formTitle").textContent = "Edit transaction";
+    $("submitBtn").textContent = "Save";
+    $("cancelEdit").hidden = false;
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function remove(id) {
+    if (!confirm("Delete this transaction?")) return;
+    transactions = transactions.filter(t => t.id !== id);
+    if (editingId === id) resetForm();
+    save(); render();
+  }
+
+  // ---- Events ----
+  form.addEventListener("submit", e => {
+    e.preventDefault();
+    const amount = parseFloat(amountEl.value);
+    if (!(amount > 0)) { amountEl.focus(); return; }
+    const data = {
+      type: currentType(),
+      amount,
+      date: dateEl.value,
+      category: catEl.value,
+      desc: descEl.value.trim()
+    };
+    if (editingId) {
+      transactions = transactions.map(t => t.id === editingId ? { ...t, ...data } : t);
+    } else {
+      transactions.push({ id: Date.now(), ...data });
+    }
+    save(); resetForm(); render();
+  });
+
+  form.querySelectorAll('input[name="type"]').forEach(r =>
+    r.addEventListener("change", () => fillCategories()));
+  $("cancelEdit").addEventListener("click", resetForm);
+  fMonth.addEventListener("change", render);
+  fType.addEventListener("change", render);
+  $("allTime").addEventListener("click", () => { fMonth.value = ""; render(); });
+
+  $("exportBtn").addEventListener("click", () => {
+    const esc = v => `"${String(v).replace(/"/g, '""')}"`;
+    const lines = ["date,type,category,amount,description"].concat(
+      filtered().map(t => [t.date, t.type, t.category, t.amount, esc(t.desc)].join(","))
+    );
+    const blob = new Blob([lines.join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "transactions.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  });
+
+  $("clearBtn").addEventListener("click", () => {
+    if (!transactions.length) return;
+    if (!confirm("This permanently deletes all transactions. Continue?")) return;
+    transactions = [];
+    save(); resetForm(); render();
+  });
+
+  // ---- Init ----
+  fMonth.value = today().slice(0, 7);
+  resetForm();
+  render();
+})();
+</script>
+</body>
+</html>
